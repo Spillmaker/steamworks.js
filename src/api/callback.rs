@@ -9,7 +9,7 @@ pub mod callback {
     };
     use steamworks::{
         CallbackHandle, PersonaStateChange, SteamServerConnectFailure, SteamServersConnected,
-        SteamServersDisconnected, GameOverlayActivated
+        SteamServersDisconnected, GameOverlayActivated,
     };
 
     #[napi]
