@@ -80,6 +80,7 @@ export namespace localplayer {
   /** @returns the 2 digit ISO 3166-1-alpha-2 format country code which client is running in, e.g. "US" or "UK". */
   export function getIpCountry(): string
   export function setRichPresence(key: string, value?: string | undefined | null): void
+  export function activateGameOverlayToWebPage(url: string): void
 }
 export namespace matchmaking {
   export const enum LobbyType {
@@ -106,7 +107,7 @@ export namespace matchmaking {
     deleteData(key: string): boolean
     /** Get an object containing all the lobby data */
     getFullData(): Record<string, string>
-    /** Merge current lobby data with provided data */
+    /** Merge current lobby data with provided data in a single batch */
     mergeFullData(data: Record<string, string>): boolean
   }
 }

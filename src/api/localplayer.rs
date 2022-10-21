@@ -47,4 +47,10 @@ pub mod localplayer {
         let client = crate::client::get_client();
         client.friends().set_rich_presence(&key, value.as_deref());
     }
+
+    #[napi]
+    pub fn activate_game_overlay_to_web_page(url: String) {
+        let client = crate::client::get_client();
+        client.friends().activate_game_overlay_to_web_page(&url);
+    }
 }
