@@ -9,7 +9,7 @@ pub mod callback {
     };
     use steamworks::{
         CallbackHandle, PersonaStateChange, SteamServerConnectFailure, SteamServersConnected,
-        SteamServersDisconnected,
+        SteamServersDisconnected, GameOverlayActivated
     };
 
     #[napi]
@@ -33,6 +33,7 @@ pub mod callback {
         SteamServerConnectFailure,
         LobbyDataUpdate,
         LobbyChatUpdate,
+        GameOverlayActivated,
     }
 
     #[napi(ts_generic_types = "C extends keyof import('./callbacks').CallbackReturns")]
@@ -63,6 +64,9 @@ pub mod callback {
             }
             SteamCallback::LobbyChatUpdate => {
                 register_callback::<steamworks::LobbyChatUpdate>(threadsafe_handler)
+            }
+            SteamCallback::GameOverlayActivated => {
+                register_callback::<GameOverlayActivated>(threadsafe_handler)
             }
         };
 
