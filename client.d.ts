@@ -220,6 +220,7 @@ export declare namespace utils {
   export function getAppId(): number
   export function getServerRealTime(): number
   export function isSteamRunningOnSteamDeck(): boolean
+  export function isOverlayEnabled(): boolean
   export const enum GamepadTextInputMode {
     Normal = 0,
     Password = 1

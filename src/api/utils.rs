@@ -26,6 +26,12 @@ pub mod utils {
     }
 
     #[napi]
+    pub fn is_overlay_enabled() -> bool {
+        let client = crate::client::get_client();
+        client.utils().is_overlay_enabled()
+    }
+
+    #[napi]
     pub enum GamepadTextInputMode {
         Normal,
         Password,
