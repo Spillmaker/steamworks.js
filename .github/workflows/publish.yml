@@ -123,8 +123,14 @@ jobs:
           echo "- Root directory:" && ls
           echo "- Dist directory:" && ls -R dist
 
-      - name: Zip all binaries for release
-        run: zip -r spillmaker-steamworks-${{ github.ref_name }}.zip . -x ".git/*"
+      - name: Pack npm package
+        run: npm pack
+
+      - name: Rename npm package
+        run: |
+          PKG_FILE=$(ls *.tgz | head -n 1)
+          mv "$PKG_FILE" "spillmaker-steamworks-v${{ github.ref_name }}.tgz"
+
 
       - name: Create GitHub Release
         id: create_release
@@ -137,12 +143,12 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload cross-platform bundle
+      - name: Upload npm package (.tgz)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: spillmaker-steamworks-${{ github.ref_name }}.zip
-          asset_name: spillmaker-steamworks-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
+          asset_path: spillmaker-steamworks-v${{ github.ref_name }}.tgz
+          asset_name: spillmaker-steamworks-v${{ github.ref_name }}.tgz
+          asset_content_type: application/gzip
