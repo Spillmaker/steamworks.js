@@ -1,137 +1,149 @@
 name: Publish
 
 on:
-    push:
-        branches: [main]
-    pull_request:
+  push:
+    branches: [main]
+    tags:
+      - '*'
+  pull_request:
 
 env:
-    DEBUG: 'napi:*'
-    MACOSX_DEPLOYMENT_TARGET: '10.13'
+  DEBUG: 'napi:*'
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
 
 jobs:
-    check:
-        runs-on: ubuntu-latest
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-        steps:
-            - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
-            - name: Setup Rust
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  toolchain: stable
-          
-            - name: Install rustfmt
-              run: rustup component add rustfmt
+      - name: Install rustfmt
+        run: rustup component add rustfmt
 
-            - name: Check formatting
-              run: cargo fmt --all --check
+      - name: Check formatting
+        run: cargo fmt --all --check
 
-            - name: Clippy
-              run: cargo clippy
+      - name: Clippy
+        run: cargo clippy
 
-    build:
-        runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+    steps:
+      - uses: actions/checkout@v4
 
-        # Run in ubuntu:20.04 container to avoid the issue with glibc version
-        container:
-            image: ubuntu:20.04
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
 
-        steps:
-            - uses: actions/checkout@v4
+      - run: apt-get update && apt-get install -y curl build-essential
 
-            - name: Setup Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 22.x
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu
 
-            # ubuntu:20.04 does not have curl and gcc/g++ installed by default
-            - run: apt-get update && apt-get install -y curl build-essential
+      - uses: Swatinem/rust-cache@v2
 
-            - name: Setup Rust
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  toolchain: stable
-                  targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu
+      - run: cargo install cargo-xwin
 
-            - uses: Swatinem/rust-cache@v2
+      - name: Node install
+        run: npm ci
 
-            - run: cargo install cargo-xwin
+      - name: Build Linux
+        run: npm run build -- --target x86_64-unknown-linux-gnu
 
-            - name: Node install
-              run: npm ci
+      - name: Build Windows
+        run: npm run build -- --target x86_64-pc-windows-msvc
 
-            - name: Build Linux
-              run: npm run build -- --target x86_64-unknown-linux-gnu
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-windows-linux
+          path: dist
+          if-no-files-found: error
 
-            - name: Build Windows
-              run: npm run build -- --target x86_64-pc-windows-msvc
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: binaries-windows-linux
-                  path: dist
-                  if-no-files-found: error
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
 
-    build-mac:
-        runs-on: macos-latest
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin, aarch64-apple-darwin
 
-        steps:
-            - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
-            - name: Setup Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 22.x
+      - name: Node install
+        run: npm ci
 
-            - name: Setup Rust
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  toolchain: stable
-                  targets: x86_64-apple-darwin, aarch64-apple-darwin
+      - name: Build Mac x64
+        run: npm run build -- --target x86_64-apple-darwin
 
-            - uses: Swatinem/rust-cache@v2
+      - name: Build Mac arm64
+        run: npm run build -- --target aarch64-apple-darwin
 
-            - name: Node install
-              run: npm ci
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-macos
+          path: dist
+          if-no-files-found: error
 
-            - name: Build Mac x64
-              run: npm run build -- --target x86_64-apple-darwin
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [build, build-mac]
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Build Mac arm64
-              run: npm run build -- --target aarch64-apple-darwin
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          pattern: binaries-*
+          merge-multiple: true
 
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: binaries-macos
-                  path: dist
-                  if-no-files-found: error
+      - name: Log files
+        run: |
+          echo "- Root directory:" && ls
+          echo "- Dist directory:" && ls -R dist
 
-    deploy:
-        # prevents this action from running on forks or pull requests
-        if: ${{ github.repository == 'ceifa/steamworks.js' && github.event_name == 'push' }}
+      - name: Zip all binaries for release
+        run: zip -r spillmaker-steamworks-${{ github.ref_name }}.zip . -x ".git/*"
 
-        runs-on: ubuntu-latest
-        needs: [build, build-mac]
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
 
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Download build
-              uses: actions/download-artifact@v4
-              with:
-                  path: dist/
-                  pattern: binaries-*
-                  merge-multiple: true
-
-            - name: Log files
-              run: |
-                  echo "- Root directory:" && ls
-                  echo "- Dist directory:" && ls -R dist
-
-            - name: Publish to npm
-              uses: JS-DevTools/npm-publish@v1
-              with:
-                  token: ${{ secrets.NPM_TOKEN }}
+      - name: Upload cross-platform bundle
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: spillmaker-steamworks-${{ github.ref_name }}.zip
+          asset_name: spillmaker-steamworks-${{ github.ref_name }}.zip
+          asset_content_type: application/zip
